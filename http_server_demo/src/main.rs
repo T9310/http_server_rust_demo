@@ -32,6 +32,8 @@ fn handle_connection(mut stream: TcpStream) {
 
     let (status_line, filename) = if buffer.starts_with(get_home) { // Standard Pfad
         ("HTTP/1.1 200 OK".to_string(), "hello.html".to_string())
+    } else if buffer.starts_with(b"PORENTA / HTTP/1.1\r\n"){
+        handle_PORENTA()
     } else if buffer.starts_with(get) {
         handle_get(&request)
     } else if buffer.starts_with(post) {
@@ -67,6 +69,10 @@ fn handle_get(request: &str) -> (String, String) {
     ("HTTP/1.1 200 OK".to_string(), target_html)
 }
 
+fn handle_PORENTA() -> (String, String) {
+    ("HTTP/1.1 200 OK".to_string(), "PORENTA.txt".to_string())
+}
+
 
 fn find_target_html(request: &str) -> String {
     let start_index = request.find("/").unwrap_or(0) + 1;
@@ -80,7 +86,7 @@ fn find_target_html(request: &str) -> String {
 
 fn handle_post(request: &str) -> (String, String) {
     let target_html = find_target_html(request);
-    let body = extract_post_body(request);
+    let body = extract_post_data(request);
     println!("POST Body: {}", body);
 
     let response = fs::read_to_string(&target_html)
@@ -97,16 +103,16 @@ fn handle_post(request: &str) -> (String, String) {
     )
 }
 
-fn extract_post_body(request: &str) -> String {
+fn extract_post_data(request: &str) -> String {
     let content_length_header = "Content-Length: ";
-    if let Some(start) = request.find(content_length_header) {
-        let content_length_start = start + content_length_header.len();
-        if let Some(end) = request[start..].find("\r\n") {
-            let content_length_str = &request[content_length_start..start + end];
-            if let Ok(content_length) = content_length_str.trim().parse::<usize>() {
-                let body_start = request.find("\r\n\r\n").unwrap() + 4;
-                let body_end = body_start + content_length;
-                return request[body_start..body_end].to_string();
+    if let Some(start) = request.find(content_length_header) { // Finden vom Indes des ersten zeichens in "Content Length:"
+        let content_length_start = start + content_length_header.len(); // Finden des Anfangs der Zahl hinter "Content Legnth:"
+        if let Some(end) = request[start..].find("\r\n") { // Finden des endes der Zahl
+            let content_length_str = &request[content_length_start..start + end]; // Die Zahl zu string
+            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { // Die Zahl zu integer
+                let body_start = request.find("\r\n\r\n").unwrap() + 4; // Finden des Ende des Heads / Anfang des Bodys
+                let body_end = body_start + content_length; //Finden des ENde des Bodys oder Daten
+                return request[body_start..body_end].to_string(); //Daten zu String
             }
         }
     }
