@@ -91,6 +91,7 @@ fn handle_post(request: &str) -> (String, String) {
 
     let response = match fs::read_to_string(&target_html) {
         Ok(contents) => {
+            let contents = contents.replace("{{POST_DATA}}", &body);
             contents
         },
         Err(_) => {
