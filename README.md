@@ -1,4 +1,4 @@
-#README Http Server Demo in Rust
+# README Http Server Demo in Rust
 
 This is a practice project aimed at learning Rust by implementing an HTTP server. The server is not suitable for production use.
 
