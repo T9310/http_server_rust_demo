@@ -4,7 +4,7 @@ use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let listener = TcpListener::bind("0.0.0.0:8000").unwrap(); // Socket
     let pool = ThreadPool::new(2);
 
     for stream in listener.incoming() {
@@ -31,17 +31,17 @@ fn handle_connection(mut stream: TcpStream) {
     let post = b"POST";
 
     let (status_line, filename) = if buffer.starts_with(get_home) { // Standard Pfad
-        ("HTTP/1.1 200 OK".to_string(), "hello.html".to_string())
+        ("HTTP/1.1 200 OK".to_string(), "html_files/hello.html".to_string())
     } else if buffer.starts_with(b"PORENTA / HTTP/1.1\r\n"){
-        handle_PORENTA()
+        handle_porenta()
     } else if buffer.starts_with(get) {
         handle_get(&request)
     } else if buffer.starts_with(post) {
         handle_post(&request)
     } else {
-        ("HTTP/1.1 405 METHOD NOT ALLOWED".to_string(), "unknown.html".to_string())
+        ("HTTP/1.1 405 METHOD NOT ALLOWED".to_string(), "html_files/unknown.html".to_string())
     };
-
+    
     let response = match fs::read_to_string(&filename) {
         Ok(contents) => format!(
             "{}\r\nContent-Length: {}\r\n\r\n{}",
@@ -50,7 +50,7 @@ fn handle_connection(mut stream: TcpStream) {
             contents
         ),
         Err(_) => {
-            let contents = fs::read_to_string("404.html").unwrap();
+            let contents = fs::read_to_string("html_files/404.html").unwrap();
             format!(
                 "{}\r\nContent-Length: {}\r\n\r\n{}",
                 status_line,
@@ -69,8 +69,8 @@ fn handle_get(request: &str) -> (String, String) {
     ("HTTP/1.1 200 OK".to_string(), target_html)
 }
 
-fn handle_PORENTA() -> (String, String) {
-    ("HTTP/1.1 200 OK".to_string(), "PORENTA.txt".to_string())
+fn handle_porenta() -> (String, String) {
+    ("HTTP/1.1 200 OK".to_string(), "html_files/PORENTA.txt".to_string())
 }
 
 
@@ -78,7 +78,7 @@ fn find_target_html(request: &str) -> String {
     let start_index = request.find("/").unwrap_or(0) + 1;
     let end_index = request[start_index..].find(" ").unwrap_or(0) + start_index;
     let target = &request[start_index..end_index];
-    let target_html = format!("{}.html", target);
+    let target_html = format!("html_files/{}", target);
     println!("{}", target_html);
     target_html
 }
@@ -89,11 +89,16 @@ fn handle_post(request: &str) -> (String, String) {
     let body = extract_post_data(request);
     println!("POST Body: {}", body);
 
-    let response = fs::read_to_string(&target_html)
-        .unwrap()
-        .replace("{{POST_DATA}}", &body);
+    let response = match fs::read_to_string(&target_html) {
+        Ok(contents) => {
+            contents
+        },
+        Err(_) => {
+            let contents = fs::read_to_string("html_files/404.html").unwrap();
+            contents
+        },
+    };
     let response_len = response.len();
-
     (
         format!(
             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
@@ -105,14 +110,14 @@ fn handle_post(request: &str) -> (String, String) {
 
 fn extract_post_data(request: &str) -> String {
     let content_length_header = "Content-Length: ";
-    if let Some(start) = request.find(content_length_header) { // Finden vom Indes des ersten zeichens in "Content Length:"
-        let content_length_start = start + content_length_header.len(); // Finden des Anfangs der Zahl hinter "Content Legnth:"
-        if let Some(end) = request[start..].find("\r\n") { // Finden des endes der Zahl
-            let content_length_str = &request[content_length_start..start + end]; // Die Zahl zu string
-            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { // Die Zahl zu integer
-                let body_start = request.find("\r\n\r\n").unwrap() + 4; // Finden des Ende des Heads / Anfang des Bodys
-                let body_end = body_start + content_length; //Finden des ENde des Bodys oder Daten
-                return request[body_start..body_end].to_string(); //Daten zu String
+    if let Some(start) = request.find(content_length_header) {
+        let content_length_start = start + content_length_header.len(); 
+        if let Some(end) = request[start..].find("\r\n") { 
+            let content_length_str = &request[content_length_start..start + end];
+            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { 
+                let body_start = request.find("\r\n\r\n").unwrap() + 4; 
+                let body_end = body_start + content_length; 
+                return request[body_start..body_end].to_string(); 
             }
         }
     }
