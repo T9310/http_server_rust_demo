@@ -33,3 +33,4 @@ and
 docker run -p 8000:8000 http_server_demo
 ```
 
+#### The server will now be waiting for requests on `127.0.0.1:8000`.
