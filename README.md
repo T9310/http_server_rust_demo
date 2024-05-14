@@ -1,3 +1,5 @@
+#README Http Server Demo in Rust
+
 This is a practice project aimed at learning Rust by implementing an HTTP server. The server is not suitable for production use.
 
 The server is based on this tutorial: https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
