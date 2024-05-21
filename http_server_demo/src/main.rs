@@ -42,23 +42,30 @@ fn handle_connection(mut stream: TcpStream) {
         ("HTTP/1.1 405 METHOD NOT ALLOWED".to_string(), "html_files/unknown.html".to_string())
     };
     
-    let response = match fs::read_to_string(&filename) {
-        Ok(contents) => format!(
-            "{}\r\nContent-Length: {}\r\n\r\n{}",
-            status_line,
-            contents.len(),
-            contents
-        ),
-        Err(_) => {
-            let contents = fs::read_to_string("html_files/404.html").unwrap();
-            format!(
-                "{}\r\nContent-Length: {}\r\n\r\n{}",
+    let response: String;
+
+    if !buffer.starts_with(post) {
+        response = match fs::read_to_string(&filename) {
+            Ok(contents) => format!(
+                "{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 status_line,
                 contents.len(),
                 contents
-            )
-        }
-    };
+            ),
+            Err(_) => {
+                let contents = fs::read_to_string("html_files/404.html").unwrap();
+                format!(
+                    "{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    status_line,
+                    contents.len(),
+                    contents
+                )
+            }
+        };
+    } else {
+        response = status_line;
+    }
+
 
     stream.write_all(response.as_bytes()).unwrap();
     stream.flush().unwrap();
@@ -99,26 +106,27 @@ fn handle_post(request: &str) -> (String, String) {
             contents
         },
     };
+
     let response_len = response.len();
     (
         format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
             response_len, response
         ),
-        response,
+        target_html,
     )
 }
 
 fn extract_post_data(request: &str) -> String {
     let content_length_header = "Content-Length: ";
-    if let Some(start) = request.find(content_length_header) {
-        let content_length_start = start + content_length_header.len(); 
-        if let Some(end) = request[start..].find("\r\n") { 
-            let content_length_str = &request[content_length_start..start + end];
-            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { 
-                let body_start = request.find("\r\n\r\n").unwrap() + 4; 
-                let body_end = body_start + content_length; 
-                return request[body_start..body_end].to_string(); 
+    if let Some(start) = request.find(content_length_header) { // Finden vom Index des ersten zeichens in "Content Length:"
+        let content_length_start = start + content_length_header.len(); // Finden des Anfangs der Zahl hinter "Content Legnth:"
+        if let Some(end) = request[start..].find("\r\n") { // Finden des endes der Zahl
+            let content_length_str = &request[content_length_start..start + end]; // Die Zahl zu string
+            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { // Die Zahl zu integer
+                let body_start = request.find("\r\n\r\n").unwrap() + 4; // Finden des Ende des Heads / Anfang des Bodys
+                let body_end = body_start + content_length; //Finden des ENde des Bodys oder Daten
+                return request[body_start..body_end].to_string(); //Daten zu String
             }
         }
     }
