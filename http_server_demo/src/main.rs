@@ -3,8 +3,9 @@ use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
+
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:8000").unwrap(); // Socket
+    let listener = TcpListener::bind("0.0.0.0:8000").unwrap(); 
     let pool = ThreadPool::new(2);
 
     for stream in listener.incoming() {
@@ -30,48 +31,54 @@ fn handle_connection(mut stream: TcpStream) {
     let get = b"GET";
     let post = b"POST";
 
-    let (status_line, filename) = if buffer.starts_with(get_home) { // Standard Pfad
+    let (status_line, filename) = if buffer.starts_with(get_home) { 
         ("HTTP/1.1 200 OK".to_string(), "html_files/hello.html".to_string())
     } else if buffer.starts_with(b"PORENTA / HTTP/1.1\r\n"){
         handle_porenta()
-    } else if buffer.starts_with(get) {
-        handle_get(&request)
-    } else if buffer.starts_with(post) {
-        handle_post(&request)
+    } else if buffer.starts_with(get) || buffer.starts_with(post) {
+        handle_get_post(&request)
     } else {
         ("HTTP/1.1 405 METHOD NOT ALLOWED".to_string(), "html_files/unknown.html".to_string())
     };
     
     let response: String;
 
-    if !buffer.starts_with(post) {
-        response = match fs::read_to_string(&filename) {
-            Ok(contents) => format!(
-                "{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                status_line,
-                contents.len(),
-                contents
-            ),
-            Err(_) => {
-                let contents = fs::read_to_string("html_files/404.html").unwrap();
-                format!(
-                    "{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                    status_line,
-                    contents.len(),
-                    contents
-                )
-            }
-        };
+    if buffer.starts_with(post) {
+        response = add_post_data_to_response(generate_response(&filename, &status_line), &request);
     } else {
-        response = status_line;
+        response = generate_response(&filename, &status_line);
     }
 
+    let response = add_content_length_to_response(response);
+
+    println!("Response: \n{}", &response);
 
     stream.write_all(response.as_bytes()).unwrap();
     stream.flush().unwrap();
 }
 
-fn handle_get(request: &str) -> (String, String) {
+fn generate_response(filename: &String, status_line: &String) -> String {
+    let response: String = match fs::read_to_string(&filename) {
+        Ok(contents) => format!(
+            "{}\r\nContent-Length: \r\nConnection: close\r\n\r\n{}",
+            status_line,
+
+            contents
+        ),
+        Err(_) => {
+            let contents = fs::read_to_string("html_files/404.html").unwrap();
+            format!(
+                "{}\r\nContent-Length: \r\nConnection: close\r\n\r\n{}",
+                status_line,
+
+                contents
+            )
+        }
+    };
+    response
+}
+
+fn handle_get_post(request: &str) -> (String, String) {
     let target_html = find_target_html(request);
     ("HTTP/1.1 200 OK".to_string(), target_html)
 }
@@ -90,43 +97,33 @@ fn find_target_html(request: &str) -> String {
     target_html
 }
 
+fn add_post_data_to_response(response: String, request: &str) -> String {
+    let post_data = extract_post_data(request);
+    println!("POST Body: {}", post_data);
+    let response = response.replace("{{POST_DATA}}", &post_data);
+    response
+}
 
-fn handle_post(request: &str) -> (String, String) {
-    let target_html = find_target_html(request);
-    let body = extract_post_data(request);
-    println!("POST Body: {}", body);
+fn add_content_length_to_response(response: String) -> String {
+    let body_start = response.find("\r\n\r\n").unwrap() + 4;
+    let body_end = response.len();
 
-    let response = match fs::read_to_string(&target_html) {
-        Ok(contents) => {
-            let contents = contents.replace("{{POST_DATA}}", &body);
-            contents
-        },
-        Err(_) => {
-            let contents = fs::read_to_string("html_files/404.html").unwrap();
-            contents
-        },
-    };
+    let content_length: usize = body_end - body_start;
+    let response = response.replace("Content-Length: ", &format!("Content-Length: {}", content_length));
 
-    let response_len = response.len();
-    (
-        format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            response_len, response
-        ),
-        target_html,
-    )
+    response
 }
 
 fn extract_post_data(request: &str) -> String {
     let content_length_header = "Content-Length: ";
-    if let Some(start) = request.find(content_length_header) { // Finden vom Index des ersten zeichens in "Content Length:"
-        let content_length_start = start + content_length_header.len(); // Finden des Anfangs der Zahl hinter "Content Legnth:"
-        if let Some(end) = request[start..].find("\r\n") { // Finden des endes der Zahl
-            let content_length_str = &request[content_length_start..start + end]; // Die Zahl zu string
-            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { // Die Zahl zu integer
-                let body_start = request.find("\r\n\r\n").unwrap() + 4; // Finden des Ende des Heads / Anfang des Bodys
-                let body_end = body_start + content_length; //Finden des ENde des Bodys oder Daten
-                return request[body_start..body_end].to_string(); //Daten zu String
+    if let Some(start) = request.find(content_length_header) { 
+        let content_length_start = start + content_length_header.len(); 
+        if let Some(end) = request[start..].find("\r\n") { 
+            let content_length_str = &request[content_length_start..start + end]; 
+            if let Ok(content_length) = content_length_str.trim().parse::<usize>() { 
+                let body_start = request.find("\r\n\r\n").unwrap() + 4; 
+                let body_end = body_start + content_length; 
+                return request[body_start..body_end].to_string(); 
             }
         }
     }
