@@ -58,19 +58,20 @@ fn handle_connection(mut stream: TcpStream) {
 }
 
 fn generate_response(filename: &String, status_line: &String) -> String {
-    let response: String = match fs::read_to_string(&filename) {
+let response = match fs::read_to_string(&filename) {
         Ok(contents) => format!(
             "{}\r\nContent-Length: \r\nConnection: close\r\n\r\n{}",
             status_line,
-
             contents
         ),
         Err(_) => {
-            let contents = fs::read_to_string("html_files/404.html").unwrap();
+            let contents = match fs::read_to_string("html_files/404.html") {
+                Ok(contents) => contents,
+                Err(_) => "ERROR 404".to_string(),
+            };
             format!(
                 "{}\r\nContent-Length: \r\nConnection: close\r\n\r\n{}",
                 status_line,
-
                 contents
             )
         }
@@ -109,6 +110,7 @@ fn add_content_length_to_response(response: String) -> String {
     let body_end = response.len();
 
     let content_length: usize = body_end - body_start;
+    println!("Conten-length: {}", content_length);
     let response = response.replace("Content-Length: ", &format!("Content-Length: {}", content_length));
 
     response
