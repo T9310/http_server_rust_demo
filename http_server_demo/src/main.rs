@@ -17,7 +17,8 @@ fn main() {
     let handlers: Vec<Arc<dyn ConnectionHandler + Send + Sync>> = vec![
         Arc::new(connection_handlers::home_page_handler::HomePageHandler),
         Arc::new(connection_handlers::post_example_handler::PostHandler),
-        Arc::new(connection_handlers::porenta_handler::PorentaHandler)
+        Arc::new(connection_handlers::porenta_handler::PorentaHandler),
+        Arc::new(connection_handlers::html_file_handler::HtmlFileHandler)
     ];
 
     for stream in listener.incoming() {
