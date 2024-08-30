@@ -6,6 +6,8 @@ The server is based on this tutorial: https://doc.rust-lang.org/book/ch20-03-gra
 
 The server has been extended to also handle POST requests. In addition to handling GET requests as described in the original tutorial, this server can now respond to POST requests. New HTML files can be added without further modifying the code. If errors occur, the server can respond with appropriate error codes such as 404 (Not Found) and 405 (Method Not Allowed).
 
+Newest Update: Using Polymorphism over if, else cases for connection handling for better observance of the open closed princible :)
+
 You can use Docker to start the server. To do this, at the level of the Dockerfile, execute the following commands:
 
 ```bash
