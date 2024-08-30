@@ -4,10 +4,11 @@ use crate::connection_handler_trait::ConnectionHandler;
 
 
 impl PostHandler {
+    /*
     fn handle_post(&self, request: &str) -> (String, String) {
         let target_html = <PostHandler as ConnectionHandler>::find_target_html(&self, request);
         ("HTTP/1.1 200 OK".to_string(), target_html)
-    }
+    }*/
 
     fn add_post_data_to_response(&self, response: String, request: &str) -> String {
         let post_data = self.extract_post_data(request);
@@ -37,8 +38,10 @@ impl ConnectionHandler for PostHandler {
         let post = b"POST";
 
         if buffer.starts_with(post) {
-            let (status_line, filename) = self.handle_post(request);
-            let mut response = self.generate_response_from_html_file(&filename, &status_line);
+            // let (status_line, filename) = self.handle_post(request);
+            let status_line = "HTTP/1.1 200 OK".to_string();
+            let filename = self.find_target_html( request);
+            let mut response = self.generate_response_from_file(&filename, &status_line);
 
             response = self.add_post_data_to_response(response, request);
 
