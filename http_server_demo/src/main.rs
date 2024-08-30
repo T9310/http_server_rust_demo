@@ -18,7 +18,8 @@ fn main() {
         Arc::new(connection_handlers::home_page_handler::HomePageHandler),
         Arc::new(connection_handlers::post_example_handler::PostHandler),
         Arc::new(connection_handlers::porenta_handler::PorentaHandler),
-        Arc::new(connection_handlers::html_file_handler::HtmlFileHandler)
+        Arc::new(connection_handlers::html_file_handler::HtmlFileHandler),
+        Arc::new(connection_handlers::method_unknown_handler::MethodUnknownHandler)
     ];
 
     for stream in listener.incoming() {
