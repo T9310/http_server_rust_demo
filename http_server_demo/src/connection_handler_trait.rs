@@ -18,7 +18,7 @@ pub trait ConnectionHandler {
                     };
                     format!(
                         "{}\r\nContent-Length: \r\nConnection: close\r\n\r\n{}",
-                        status_line,
+                        "HTTP/1.1 404 ERROR",
                         contents
                     )
                 }
