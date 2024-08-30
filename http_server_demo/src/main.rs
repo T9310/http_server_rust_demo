@@ -3,59 +3,64 @@ use std::fs;
 use std::io::prelude::*;
 use std::net::TcpListener;
 use std::net::TcpStream;
+use std::sync::Arc;
+
+mod connection_handler_trait;
+use crate::connection_handler_trait::ConnectionHandler;
 
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:8000").unwrap(); 
+    let listener = TcpListener::bind("0.0.0.0:8000").unwrap();
     let pool = ThreadPool::new(2);
+
+    let handlers: Vec<Arc<dyn ConnectionHandler + Send + Sync>> = vec![
+        Arc::new(HomePageHandler)
+    ];
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
+        let handlers = handlers.clone();
 
-        pool.execute(|| {
-            handle_connection(stream);
+        pool.execute(move || {
+            handle_connection(stream, &handlers);
         });
     }
-
 
     println!("Shutting down.");
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream, handlers: &[Arc<dyn ConnectionHandler + Send + Sync>]) {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).unwrap();
 
     let request = String::from_utf8_lossy(&buffer[..]);
     println!("Received request:\n{}", request);
 
-    let get_home = b"GET / HTTP/1.1\r\n";
-    let get = b"GET";
-    let post = b"POST";
-
-    let (status_line, filename) = if buffer.starts_with(get_home) { 
-        ("HTTP/1.1 200 OK".to_string(), "html_files/hello.html".to_string())
-    } else if buffer.starts_with(b"PORENTA / HTTP/1.1\r\n"){
-        handle_porenta()
-    } else if buffer.starts_with(get) || buffer.starts_with(post) {
-        handle_get_post(&request)
-    } else {
-        ("HTTP/1.1 405 METHOD NOT ALLOWED".to_string(), "html_files/unknown.html".to_string())
-    };
-    
-    let response: String;
-
-    if buffer.starts_with(post) {
-        response = add_post_data_to_response(generate_response(&filename, &status_line), &request);
-    } else {
-        response = generate_response(&filename, &status_line);
+    for handler in handlers {
+        if let Some(response) = handler.handle(&request, &buffer) {
+            stream.write_all(response.as_bytes()).unwrap();
+            stream.flush().unwrap();
+            return;
+        }
     }
-
-    let response = add_content_length_to_response(response);
-
-    println!("Response: \n{}", &response);
-
-    stream.write_all(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
 }
+
+
+
+struct HomePageHandler;
+
+impl ConnectionHandler for HomePageHandler {
+    fn handle(&self, request: &str, buffer: &[u8]) -> Option<String> {
+        let get_home = b"GET / HTTP/1.1\r\n";
+        if buffer.starts_with(get_home) {
+            let status_line = "HTTP/1.1 200 OK".to_string();
+            let filename = "html_files/hello.html".to_string();
+            Some(add_content_length_to_response(generate_response(&filename, &status_line)))
+        } else {
+            None
+        }
+    }
+}
+
 
 fn generate_response(filename: &String, status_line: &String) -> String {
 let response = match fs::read_to_string(&filename) {
